@@ -21,8 +21,13 @@ Click here: [https://anigma.io](https://anigma.io)
 * [x] when a mobile user starts typing, make the mic and attach-image buttons disappear
 * [x] parse youtube video urls and display them as embedded
 * [x] keep the keyboard visible after you send a message on mobile
+* [x] multi select emojis before closing emoji window
+* [x] create a mini player for youtube videos so you can leave the channel and keep the video playing
+* [x] if that's not possible, at least make videos not scroll up when someone posts a message while a video is playing
+* [ ] fix bug where picture-in-picture youtube videos go to the bottom of the channel on mobile instead of wherever you clicked
+* [ ] fix bug where picture-in-picture youtube videos move weirdly on mobile
+* [ ] fix bug where if you watch a picture-in-picture youtube video on mobile and open the sidebar, the sidebar becomes too long 
 * [ ] private groups with shared decryption keys
-* [ ] multi select emojis before closing emoji window
 * [ ] integrate lnbits
 * [ ] make an option to set and modify relays in settings
 * [ ] connect to at least two relays by default
@@ -53,3 +58,9 @@ Click here: [https://anigma.io](https://anigma.io)
 * [ ] investigate why new messages don't always show up as the latest message in the sidebar
 * [ ] add a "messages not read" delineating line if you go to a channel or a dm with fewer than 200 unread messages in it, separating the messages you read from the messages you didn't
 * [ ] if a "messages not read" line exists when entering a channel or a dm containing unread messages, autoscroll to that instead of to the latest message
+* [ ] fix the bug that makes stuff disappear below the fold when images and videos expand
+* [ ] the anigma browser tab should show a notification when new messages arrive
+* [ ] print the total messages that are in a channels in the channel about div
+* [ ] if a user is not near the bottom of the chat log, don't scroll to the bottom when they open up the keyboard
+* [ ] users who click or tap the back button should not close the app. They should go to the previous page
+* [ ] users who go from a channel to a profile should have a button to go back to the channel. The button that seems most obvious currently takes them to the sidebar
