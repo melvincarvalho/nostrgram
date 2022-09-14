@@ -146,7 +146,7 @@
                     if ( !url.startsWith( "http://" ) && !url.startsWith( "https://" ) ) {
                         url2 = "http://" + url;
                     }
-                    return `<a href="${url2}" target="_blank" rel="nofollow noopener" style="color: #4287f5;" onclick="event.stopPropagation()">${url}</a>`;
+                    return `<a onclick="event.stopPropagation()" href="${url2}" target="_blank" rel="nofollow noopener" style="color: #4287f5;">${url}</a>`;
                 })                
             }
             if ( isMine && !text.match( ytRegex ) && !text.match( imgRegex ) ) {
@@ -158,7 +158,7 @@
                     if ( !url.startsWith( "http://" ) && !url.startsWith( "https://" ) ) {
                         url2 = "http://" + url;
                     }
-                    return `<a href="${url2}" target="_blank" rel="nofollow noopener" style="color: white;" onclick="event.stopPropagation()">${url}</a>`;
+                    return `<a onclick="event.stopPropagation()" href="${url2}" target="_blank" rel="nofollow noopener" style="color: white;">${url}</a>`;
                 })
             }
             if ( text.match( imgRegex ) ) {
@@ -219,7 +219,11 @@
                         }
                         if ( sessionStorage[ "scrolled" ] == false ) {
                             sessionStorage[ "scrolled" ] = true;
-                            document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                            if ( window.innerWidth < 601 ) {
+                                document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
+                            } else {
+                                document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                            }
                             if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                                 document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                             }
@@ -230,6 +234,10 @@
                     document.getElementsByClassName( "bubble" )[ i ].parentElement.style.alignSelf = "flex-start";
                     document.getElementsByClassName( "bubble" )[ i ].parentElement.style.maxWidth = "calc( 100vw - 60px)";
                 }
+            }
+            if ( Number( sessionStorage[ "keyboard_is_open" ] ) && window.innerHeight > ( Number( sessionStorage[ "full-window-height" ] ) * 0.9 ) ) {
+                document.getElementsByClassName( "input" )[ 0 ].firstElementChild.blur();
+                sessionStorage[ "keyboard_is_open" ] = String( 0 );
             }
             setTimeout( leftJustifyImages, 3000 );
         }
@@ -308,12 +316,15 @@
         var lud06 = "";
         var array_of_pubkeys = [];
         var existing_messages = [];
+        var array_of_replies = [];
         var socket = new WebSocket( relay );
         var heartbeat = false;
         var alterPrivKey = privKey.substring( 32 ) + privKey.substring( 0, 32 );
         var alterPubKey = nobleSecp256k1.getPublicKey( alterPrivKey, true ).substring( 2 );
         var i_should_create_a_new_wallet = true;
         sessionStorage[ "my-name" ] = pubKey.substring( 0, 15 ) + "...";
+        sessionStorage[ "full-window-height" ] = window.innerHeight;
+        sessionStorage[ "keyboard_is_open" ] = String( 0 );
 
         async function getWallet() {
             if ( localStorage[ "wallet_info" ] ) {
@@ -538,6 +549,7 @@
                     submitUserInfo();
                 }
             }
+            //this runs when a message is clicked or tapped. It populates a context menu with action options such as Reply
             if ( subId.startsWith( "00000004" ) ) {
                 if ( content ) {
                     if ( event.pubkey == pubKey ) {
@@ -564,12 +576,13 @@
                     if ( content.length > 50 ) {
                         shortened_content = shortened_content + "...";
                     }
-                    shortened_content = shortened_content.replace( /\'/g, "\\'" );
+                    shortened_content_for_code = shortened_content.replace( /\'/g, "\\'" );
+                    shortened_content_for_display = shortened_content.replace( /\'/g, "\'" );
                     document.getElementById( "modal" ).innerHTML = "";
                     document.getElementById( "modal" ).innerHTML += `<div><strong>Message</strong></div>`;
-                    document.getElementById( "modal" ).innerHTML += shortened_content;
+                    document.getElementById( "modal" ).innerHTML += shortened_content_for_display;
                     document.getElementById( "modal" ).innerHTML += `<hr style="border: 1px solid; margin-top: 20px;" />`;
-                    document.getElementById( "modal" ).innerHTML += `<div class="msg-context-option"><button class="msg-context-btn" onclick="replyToMsg( '${event.id}', '${shortened_content}', '${event.pubkey}' )">Reply to this message</button></div>`;
+                    document.getElementById( "modal" ).innerHTML += `<div class="msg-context-option"><button class="msg-context-btn" onclick="replyToMsg( '${event.id}', '${shortened_content_for_code}', '${event.pubkey}' )">Reply to this message</button></div>`;
                     //document.getElementById( "modal" ).innerHTML += `<div class="msg-context-option"><button class="msg-context-btn" onclick="atAUser( '${event.pubkey}' )">@ this user</button></div>`;
                     document.getElementById( "modal" ).innerHTML += `<div class="msg-context-option"><button class="msg-context-btn" onclick="window.open( 'https://nostr.com/e/${event.id}', '_blank' )">View this event on nostr.com</button></div>`;
                     document.getElementById( "black-bg" ).style.display = "block";
@@ -616,11 +629,33 @@
                 var replyingTo = "";
                 if ( events_replied_to[ 1 ] ) {
                     replyingTo = events_replied_to[ 1 ];
+                    array_of_replies.push( [ event.id, replyingTo ] );
                 }
+                content = content.replace( /&/g, "&#38;" ).replace( /</g, "&lt;" ).replace( />/g, "&gt;" );
                 var shortened_content = content.replace( /\n/g, " " ).substring( 0, 50 );
                 if ( content.length > 50 ) {
                     shortened_content = shortened_content + "...";
                 }
+                content = markdownify( content, isMine );
+                array_of_replies.forEach( function( item ) {
+                    if ( item[ 1 ] == event.id ) {
+                        var replyPubkey = event.pubkey;
+                        if ( event.pubkey in namemap && namemap[ event.pubkey ] != "none" ) {
+                            var person_name = namemap[ event.pubkey ];
+                        } else {
+                            var person_name = replyPubkey.substring( 0, 15 );
+                        }
+                        if ( replyPubkey != pubKey ) {
+                            replyAuthor = `<span class="reply-author ${replyPubkey}">` + person_name + `</span>`;
+                        } else {
+                            replyAuthor = `<span class="reply-author ${replyPubkey}">` + sessionStorage[ "my-name" ] + `</span>`;
+                        }
+                        replyContent = shortened_content;
+                        if ( document.getElementsByClassName( item[ 0 ] )[ 0 ] ) {
+                            document.getElementsByClassName( item[ 0 ] )[ 0 ].getElementsByClassName( "reply-prefix" )[ 0 ].innerHTML = replyAuthor + '<br>' + replyContent;
+                        }
+                    }
+                });
                 var color = "";
                 if ( isNaN( event.pubkey.substring( 0, 1 ) ) && ( event.pubkey.substring( 0, 1 ) == "e" || event.pubkey.substring( 0, 1 ) == "f" ) ) {
                     color = "red";
@@ -655,8 +690,6 @@
                 if ( event.pubkey in imagemap && imagemap[ event.pubkey ] != "none" ) {
                     picture = imagemap[ event.pubkey ];
                 }
-                content = content.replace( /&/g, "&#38;" ).replace( /</g, "&lt;" ).replace( />/g, "&gt;" );
-                content = markdownify( content, isMine );
                 if ( !msg_cache[ parent ] ) {
                     msg_cache[ parent ] = [];
                 }
@@ -754,7 +787,7 @@
                     document.getElementsByClassName( "message-content" )[ 0 ].append( item );
                 });
                 if ( window.innerWidth < 601 ) {
-                    var scrollto = document.getElementsByClassName( "chat" )[ 0 ].scrollTop;
+                    var scrollto = document.getElementsByClassName( "content" )[ 0 ].scrollTop;
                     var offset = 0;
                     if ( document.getElementsByClassName( "message-content" )[ 0 ] && document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" )[ 0 ] ) {
                         offset = document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" )[ document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" ).length - 1 ].offsetHeight;
@@ -762,10 +795,10 @@
                     if ( offset > 20 ) {
                         offset = offset - 20;
                     }
-                    if ( ( document.getElementsByClassName( "chat" )[ 0 ].scrollHeight - document.getElementsByClassName( "chat" )[ 0 ].scrollTop ) > 1500 ) {
-                        document.getElementsByClassName( "chat" )[ 0 ].scrollTo( 0, scrollto + offset );
+                    if ( ( document.getElementsByClassName( "content" )[ 0 ].scrollHeight - document.getElementsByClassName( "content" )[ 0 ].scrollTop ) > 1500 ) {
+                        document.getElementsByClassName( "content" )[ 0 ].scrollTo( 0, scrollto + offset );
                     } else {
-                        document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                        document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
                         if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                             document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                         }
@@ -845,6 +878,10 @@
                     picture = imagemap[ event.pubkey ];
                 }
                 content = content.replace( /&/g, "&#38;" ).replace( /</g, "&lt;" ).replace( />/g, "&gt;" );
+                var shortened_content = content.replace( /\n/g, " " ).substring( 0, 50 );
+                if ( content.length > 50 ) {
+                    shortened_content = shortened_content + "...";
+                }
                 content = markdownify( content, isMine );
                 var events_replied_to = [];
                 var pubkeys_replied_to = [];
@@ -859,7 +896,27 @@
                 var replyingTo = "";
                 if ( events_replied_to[ 0 ] ) {
                     replyingTo = events_replied_to[ 0 ];
+                    array_of_replies.push( [ event.id, replyingTo ] );
                 }
+                array_of_replies.forEach( function( item ) {
+                    if ( item[ 1 ] == event.id ) {
+                        var replyPubkey = event.pubkey;
+                        if ( event.pubkey in namemap && namemap[ event.pubkey ] != "none" ) {
+                            var person_name = namemap[ event.pubkey ];
+                        } else {
+                            var person_name = replyPubkey.substring( 0, 15 );
+                        }
+                        if ( replyPubkey != pubKey ) {
+                            replyAuthor = `<span class="reply-author ${replyPubkey}">` + person_name + `</span>`;
+                        } else {
+                            replyAuthor = `<span class="reply-author ${replyPubkey}">` + sessionStorage[ "my-name" ] + `</span>`;
+                        }
+                        replyContent = shortened_content;
+                        if ( document.getElementsByClassName( item[ 0 ] )[ 0 ] ) {
+                            document.getElementsByClassName( item[ 0 ] )[ 0 ].getElementsByClassName( "reply-prefix" )[ 0 ].innerHTML = replyAuthor + '<br>' + replyContent;
+                        }
+                    }
+                });
                 var div = document.createElement( "div" );
                 div.classList.add( "message" );
                 div.classList.add( event.id );
@@ -961,7 +1018,7 @@
                     document.getElementsByClassName( otherKey.substring( 0, 20 ) )[ 0 ].getElementsByClassName( "message" )[ 0 ].setAttribute( "data-timestring", how_long_ago );
                 }
                 if ( window.innerWidth < 601 ) {
-                    var scrollto = document.getElementsByClassName( "chat" )[ 0 ].scrollTop;
+                    var scrollto = document.getElementsByClassName( "content" )[ 0 ].scrollTop;
                     var offset = 0;
                     if ( document.getElementsByClassName( "message-content" )[ 0 ] && document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" )[ 0 ] ) {
                         offset = document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" )[ document.getElementsByClassName( "message-content" )[ 0 ].getElementsByClassName( "message" ).length - 1 ].offsetHeight;
@@ -969,10 +1026,10 @@
                     if ( offset > 20 ) {
                         offset = offset - 20;
                     }
-                    if ( ( document.getElementsByClassName( "chat" )[ 0 ].scrollHeight - document.getElementsByClassName( "chat" )[ 0 ].scrollTop ) > 1500 ) {
-                        document.getElementsByClassName( "chat" )[ 0 ].scrollTo( 0, scrollto + offset );
+                    if ( ( document.getElementsByClassName( "content" )[ 0 ].scrollHeight - document.getElementsByClassName( "content" )[ 0 ].scrollTop ) > 1500 ) {
+                        document.getElementsByClassName( "content" )[ 0 ].scrollTo( 0, scrollto + offset );
                     } else {
-                        document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                        document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
                         if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                             document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                         }
@@ -1228,6 +1285,7 @@
     <script>
         function selectChannel( channel ) {
             sessionStorage[ "scrolled" ] = false;
+            array_of_replies = [];
             channel.getElementsByClassName( "notification" )[ 0 ].style.display = "none";
             channel.getElementsByClassName( "notification" )[ 0 ].innerText = "0";
             channel.setAttribute( "data-num-of-new-messages", "0" );
@@ -1274,7 +1332,7 @@
                             </a>
                         </li>
                         <li class="input">
-                            <textarea class="note-input" rows="1" cols="70" type="text" placeholder="Say something" onfocus='if ( window.innerWidth < 601 && ( document.getElementsByClassName( "chat" )[ 0 ].scrollHeight - document.getElementsByClassName( "chat" )[ 0 ].scrollTop ) < 1500 ) {document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;setTimeout( function() {if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();}}, 800 );}'></textarea>
+                            <textarea class="note-input" rows="1" cols="70" type="text" placeholder="Say something" onfocus='setTimeout( function() {if ( window.innerWidth < 601 && ( window.innerHeight < Number( sessionStorage[ "full-window-height" ] ) * 0.9 ) ) {sessionStorage[ "keyboard_is_open" ] = String( 1 );var size_difference = Number( sessionStorage[ "full-window-height" ] ) - window.innerHeight;var current_height = document.getElementsByClassName( "content" )[ 0 ].scrollTop;var new_height = current_height + size_difference + 50;var max_height = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;if ( new_height > max_height ) {new_height = max_height;} document.getElementsByClassName( "content" )[ 0 ].scrollTo({top: new_height, left: 0, behavior: "smooth"});}}, 600 );'></textarea>
                         </li>
                         <li class="send-btn">
                             <a>
@@ -1337,7 +1395,7 @@
             if ( window.innerWidth < 601 ) {
                 document.getElementsByClassName( "sidebar" )[ 0 ].style.display = "none";
                 document.getElementsByClassName( "content" )[ 0 ].style.display = "block";
-                document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
                 if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                     document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                 }
@@ -1502,7 +1560,11 @@
                     document.getElementsByClassName( parent )[ 0 ].getElementsByClassName( "message" )[ 0 ].setAttribute( "data-timestamp", event_time );
                     document.getElementsByClassName( parent )[ 0 ].getElementsByClassName( "message" )[ 0 ].setAttribute( "data-timestring", how_long_ago );
                 }
-                document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                if ( window.innerWidth < 601 ) {
+                    document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
+                } else {
+                    document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                }
                 if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                     document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                 }
@@ -1597,7 +1659,11 @@
                         document.getElementsByClassName( parent.substring( 0, 20 ) )[ 0 ].getElementsByClassName( "message" )[ 0 ].setAttribute( "data-timestamp", event_time );
                         document.getElementsByClassName( parent.substring( 0, 20 ) )[ 0 ].getElementsByClassName( "message" )[ 0 ].setAttribute( "data-timestring", how_long_ago );
                     }
-                    document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                    if ( window.innerWidth < 601 ) {
+                        document.getElementsByClassName( "content" )[ 0 ].scrollTop = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;
+                    } else {
+                        document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;
+                    }
                     if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {
                         document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();
                     }
@@ -1663,9 +1729,7 @@
                 "pubkey"     : pubKey,
             }
             var signedEvent = await getSignedEvent( event, privKey );
-            console.log( event );
             socket.send( JSON.stringify( [ "EVENT", signedEvent ] ) );
-            console.log( signedEvent );
             document.getElementsByClassName( "input" )[ 0 ].firstElementChild.value = "";
             document.getElementsByClassName( "reply-div" )[ 0 ].style.display = "none";
             document.getElementsByClassName( "input" )[ 0 ].firstElementChild.removeEventListener( 'keypress', enterSendPublicWithReply );
@@ -1805,6 +1869,7 @@
     </script>
     <script>
         function msgContext( id ) {
+            if ( isTextSelected() ) return;
             var msgSubId   = "00000004" + bitcoinjs.ECPair.makeRandom().privateKey.toString( "hex" ).substring( 8 );
             var msgFilter  = { "ids": [ id ] }
             var msgSub     = [ "REQ", msgSubId, msgFilter ];
@@ -1821,6 +1886,7 @@
     </script>
     <script>
         function replyToMsg( id, content, pubkey ) {
+            content = content.replace( /\\'/g, "'" );
             document.getElementById( "black-bg" ).style.display = "none";
             document.getElementById( "modal" ).style.display = "none";
             document.getElementsByClassName( "reply-div" )[ 0 ].innerHTML = `<span class="reply-x" onclick="removeReply();">&times; </span>`;
@@ -2416,6 +2482,7 @@
             document.getElementsByClassName( pubkey.substring( 0, 20 ) )[ 0 ].getElementsByClassName( "notification" )[ 0 ].innerText = "0";
             document.getElementsByClassName( pubkey.substring( 0, 20 ) )[ 0 ].setAttribute( "data-num-of-new-messages", "0" );
             existing_messages = [];
+            array_of_replies = [];
             var i; for ( i=0; i<document.getElementsByClassName( "active" ).length; i++ ) {
                 document.getElementsByClassName( "active" )[ i ].classList.remove( "active" );
             }
@@ -2450,7 +2517,7 @@
                             </a>
                         </li>
                         <li class="input">
-                            <textarea class="note-input" rows="1" cols="70" type="text" placeholder="Say something" onfocus='if ( window.innerWidth < 601 && ( document.getElementsByClassName( "chat" )[ 0 ].scrollHeight - document.getElementsByClassName( "chat" )[ 0 ].scrollTop ) < 1500 ) {document.getElementsByClassName( "message-content" )[ 0 ].scrollTop = document.getElementsByClassName( "message-content" )[ 0 ].scrollHeight;setTimeout( function() {if ( document.getElementsByClassName( "bubbletime" ).length > 0 ) {document.getElementsByClassName( "bubbletime" )[ document.getElementsByClassName( "bubbletime" ).length - 1 ].scrollIntoView();}}, 800 );}'></textarea>
+                            <textarea class="note-input" rows="1" cols="70" type="text" placeholder="Say something" onfocus='setTimeout( function() {if ( window.innerWidth < 601 && ( window.innerHeight < Number( sessionStorage[ "full-window-height" ] ) * 0.9 ) ) {sessionStorage[ "keyboard_is_open" ] = String( 1 );var size_difference = Number( sessionStorage[ "full-window-height" ] ) - window.innerHeight;var current_height = document.getElementsByClassName( "content" )[ 0 ].scrollTop;var new_height = current_height + size_difference + 50;var max_height = document.getElementsByClassName( "content" )[ 0 ].scrollHeight;if ( new_height > max_height ) {new_height = max_height;} document.getElementsByClassName( "content" )[ 0 ].scrollTo({top: new_height, left: 0, behavior: "smooth"});}}, 600 );'></textarea>
                         </li>
                         <li class="send-btn">
                             <a>
@@ -2792,6 +2859,11 @@
                 return keymap[ "Shift" ];
             }
             return false;
+        }
+    </script>
+    <script>
+        function isTextSelected() {
+            return ( window.getSelection() && window.getSelection().toString() != '' );
         }
     </script>
     <div class="chat">
