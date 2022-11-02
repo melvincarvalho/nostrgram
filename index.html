@@ -4,7 +4,16 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, user-scalable=no" />
-    <link rel="stylesheet" href="styles.css?v=57" />
+    <script>
+        if ( window.matchMedia( '(prefers-color-scheme: dark)' ).media === 'not all' || window.location.href.includes( "darkmode=true" ) ) {
+            document.documentElement.style.display = 'none';
+            document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="./styles/light.css" onload="document.documentElement.style.display = \'\'">',);
+        }
+    </script>
+    <link rel="stylesheet" href="./styles/dark.css" media="(prefers-color-scheme: dark)" />
+    <link rel="stylesheet" href="./styles/light.css" media="(prefers-color-scheme: light)"/>
+    <!-- The main stylesheet -->
+    <link rel="stylesheet" href="./styles/style.css?v=57" />
     <link rel="shortcut icon" type="image/png" href="favicon.png">
     <link rel="manifest" href="manifest.json">
     <title>Anigma</title>
@@ -135,7 +144,7 @@
         }
         function urlify( text, isMine ) {
             var ytRegex = /(http:|https:)?\/\/(www\.)?(youtube.com|youtu.be)\/(watch)?(\?v=)?(\S+)?/g
-            var imgRegex = /\b(https?:\/\/\S+(?:png|jpe?g|gif|webp|PNG|JPE?G|GIF|WEBP)\S*)\b/g;
+            var imgRegex = /\b(https?:\/\/\S+(?:\.png|\.jpe?g|\.gif|\.webp|\.PNG|\.JPE?G|\.GIF|\.WEBP)\S*)\b/g;
             var urlRegex = /\S+\.{1}[a-zA-Z0-9\?\=\&\$\+\,\;\@\#\%\-\_]{2,}\/?[a-zA-Z0-9/\\?\=\&\$\+\,\;\@\#\%\-\_\.]*/g;
             var returnable = "";
             if ( !isMine && !text.match( ytRegex ) && !text.match( imgRegex ) ) {
@@ -567,7 +576,7 @@
                     shortened_content_for_code = shortened_content.replace( /\'/g, "\\'" );
                     shortened_content_for_display = shortened_content.replace( /\'/g, "\'" );
                     document.getElementById( "modal" ).innerHTML = "";
-                    document.getElementById( "modal" ).innerHTML += `<div><strong>${t('unknownError')}</strong></div>`;
+                    document.getElementById( "modal" ).innerHTML += `<div><strong>Message</strong></div>`;
                     document.getElementById( "modal" ).innerHTML += shortened_content_for_display;
                     document.getElementById( "modal" ).innerHTML += `<hr style="border: 1px solid; margin-top: 20px;" />`;
                     document.getElementById( "modal" ).innerHTML += `<div class="msg-context-option"><button class="msg-context-btn" onclick="replyToMsg( '${event.id}', '${shortened_content_for_code}', '${event.pubkey}' )">${t('replyToThisMessage')}</button></div>`;
